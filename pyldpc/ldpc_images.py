@@ -1,12 +1,41 @@
 import numpy as np
-from .utils_img import (bin2gray, bin2rgb)
-from .encoder import encode
+from .utils_img import (bin2gray, bin2rgb, bin2I16)
+from .encoder import encode, add_AWGN, encode_with_AWGN
 from .decoder import get_message, decode
 from .utils import check_random_state
 import warnings
 
 
-def encode_img(tG, img_bin, snr, seed=None):
+def encode_image_no_noise(G: np.array, image_binary: np.array) -> np.array:
+    n, k = G.shape
+
+    height, width, depth = image_binary.shape
+    img_bin = image_binary.flatten()
+
+    n_bits_total = img_bin.size
+    n_blocks = n_bits_total // k
+    residual = n_bits_total % k
+    if residual:
+        n_blocks += 1
+    resized_img = np.zeros(k * n_blocks)
+    resized_img[:n_bits_total] = img_bin
+
+    codeword = encode(G, resized_img.reshape(k, n_blocks))
+    return codeword
+    # noise_output = add_AWGN(codeword, SNR, rng)
+    # noisy_img = (noise_output.flatten()[:n_bits_total] < 0).astype(int)
+    # noisy_img = noisy_img.reshape(height, width, depth)
+    #
+    # if depth == 8:
+    #     noisy_img = bin2gray(noisy_img)
+    # elif depth == 16:
+    #     noisy_img = bin2I16(noisy_img)
+    # else:
+    #     noisy_img = bin2rgb(noisy_img)
+    #
+    # return codeword, noisy_img
+
+def encode_img_AWGN(tG, img_bin, snr, seed: np.random.RandomState):
     """Encode a binary image and adds Gaussian white noise.
 
     Parameters
@@ -27,7 +56,7 @@ def encode_img(tG, img_bin, snr, seed=None):
     n, k = tG.shape
 
     height, width, depth = img_bin.shape
-    if depth not in [8, 24]:
+    if depth not in [8, 16, 24]:
         raise ValueError("The expected dimension of a binary image is "
                          "(width, height, 8) for grayscale images or "
                          "(width, height, 24) for RGB images; got %s"
@@ -41,12 +70,14 @@ def encode_img(tG, img_bin, snr, seed=None):
     resized_img = np.zeros(k * n_blocks)
     resized_img[:n_bits_total] = img_bin
 
-    codeword = encode(tG, resized_img.reshape(k, n_blocks), snr, seed)
+    codeword = encode_with_AWGN(tG, resized_img.reshape(k, n_blocks), snr, seed)
     noisy_img = (codeword.flatten()[:n_bits_total] < 0).astype(int)
     noisy_img = noisy_img.reshape(height, width, depth)
 
     if depth == 8:
         noisy_img = bin2gray(noisy_img)
+    elif depth == 16:
+        noisy_img = bin2I16(noisy_img)
     else:
         noisy_img = bin2rgb(noisy_img)
 
@@ -75,7 +106,7 @@ def decode_img(tG, H, codeword, snr, img_shape, maxiter=100):
     _, n_blocks = codeword.shape
 
     depth = img_shape[-1]
-    if depth not in [8, 24]:
+    if depth not in [8, 16, 24]:
         raise ValueError("The expected dimension of a binary image is "
                          "(width, height, 8) for grayscale images or "
                          "(width, height, 24) for RGB images; got %s"
@@ -102,6 +133,8 @@ def decode_img(tG, H, codeword, snr, img_shape, maxiter=100):
 
     if depth == 8:
         decoded_img = bin2gray(decoded)
+    elif depth == 16:
+        decoded_img = bin2I16(decoded)
     else:
         decoded_img = bin2rgb(decoded)
 

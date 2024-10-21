@@ -1,5 +1,19 @@
+import numpy as np
+
 from . import utils
 
+def encode(G: np.array, input: np.array):
+    n, k = G.shape
+
+    d = utils.binaryproduct(G, input)
+    x = (-1) ** d
+    return x
+
+def add_AWGN(encoded_message: np.array, SNR: float, rng: np.random.RandomState):
+    sigma = 10 ** (- SNR / 20)
+    e = rng.randn(*encoded_message.shape) * sigma
+    y = encoded_message + e
+    return y
 
 def encode_random_message(tG, snr, seed=None):
     """Encode a random message given a generating matrix tG and a SNR.
@@ -33,7 +47,7 @@ def encode_random_message(tG, snr, seed=None):
     return v, y
 
 
-def encode(tG, v, snr, seed=None):
+def encode_with_AWGN(tG, v, snr, seed=None):
     """Encode a binary message and adds Gaussian noise.
 
     Parameters

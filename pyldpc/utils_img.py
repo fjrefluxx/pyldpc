@@ -1,6 +1,16 @@
 import numpy as np
 from . import utils
 
+def bin2I16(image_bin: np.array) -> np.array:
+    height, width, k = image_bin.shape
+    img_I16 = np.zeros(shape=(height, width), dtype=np.uint16)
+
+    for i in range(height):
+        for j in range(width):
+            img_I16[i, j] = utils.bitarray2int(image_bin[i, j, :])
+
+    return img_I16
+
 
 def gray2bin(img):
     """Convert a GrayScale Image to a binary array."""
